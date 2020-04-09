@@ -1,2 +1,2 @@
 # Sistem-antiefractie
-La acest eu am facut codul
+La acest proiect, eu am facut codul
