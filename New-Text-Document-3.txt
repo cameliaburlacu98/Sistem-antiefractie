@@ -1,0 +1,196 @@
+#include <LiquidCrystal.h>
+typedef enum
+{
+stare_oprit, stare_pornit, stare_efractie, stare_senzor_detecteaza
+}
+stare_sistem;
+
+class Componenta_sistem
+{
+    protected:
+        int pin;
+    public:
+       Componenta_sistem(int p)
+       { 
+          pin=p;
+       }
+       int returnarePin()
+       {
+           return pin;
+       }
+       void setareIntrare_iesire(int intrare_iesire)
+       {
+            pinMode(pin, intrare_iesire);
+       }
+       virtual void SetareOprit() { }
+       virtual void SetarePornit() { }
+};
+
+class LED: public Componenta_sistem
+{
+   private:
+       stare_sistem sist;
+   public:
+      LED(int pin, stare_sistem s) : Componenta_sistem(pin)
+      {
+              sist = s;
+      }
+      void SetarePornit()
+      {
+           digitalWrite(pin, HIGH);
+           sist = stare_pornit;
+      }
+      void SetareOprit()
+      {
+           digitalWrite(pin, LOW);
+           sist = stare_oprit;
+      }
+};
+
+class Buton : public Componenta_sistem
+{
+     private:
+          stare_sistem sist_stat;
+     public:
+         Buton(int pin, stare_sistem s) : Componenta_sistem(pin)
+         {
+               sist_stat = s;
+         }
+         void SetareStatus(stare_sistem s)
+         {
+               sist_stat = s;
+         }
+};
+
+class SenzorHall : public Componenta_sistem
+{
+       public:
+          SenzorHall(int pin) : Componenta_sistem(pin)
+          {
+          }
+          int citire()
+          {
+             return digitalRead(pin);
+          }
+};
+ 
+class SenzorVibratii : public Componenta_sistem
+{
+     private:
+          int valoareCitita;
+     public:
+        SenzorVibratii(int pin):Componenta_sistem(pin)
+        {
+        }
+        int vibratiiMaxime(int pin, int count) 
+        {
+            int valMaxima = 0;
+            for(int i = 0; i < count; i++)
+            {
+                valMaxima = max(analogRead(pin), valMaxima);
+            }
+            return valMaxima;
+        }
+        int citesteVibratii()
+        {
+              valoareCitita = vibratiiMaxime(pin, 100);
+              return valoareCitita;
+        }
+};
+
+stare_sistem stareSistem = stare_senzor_detecteaza;
+LiquidCrystal lcd(7,6, 5, 4, 3, 2);
+LED LEDverde(11,stare_oprit);
+LED LEDrosu(8,stare_oprit);
+Buton buton(10,stare_oprit);
+SenzorHall senzor_magnetic(9);
+SenzorVibratii s_vibratii(A5);
+
+void setup()
+{
+    LEDverde.setareIntrare_iesire(OUTPUT);
+    LEDrosu.setareIntrare_iesire(OUTPUT);
+    buton.setareIntrare_iesire(INPUT);
+    s_vibratii.setareIntrare_iesire(INPUT);
+    senzor_magnetic.setareIntrare_iesire(INPUT);
+    lcd.begin(16, 2);
+    Serial.begin(9600); 
+}
+
+void loop()
+{
+   switch (stareSistem)
+   { 
+       case stare_senzor_detecteaza:
+           LEDverde.SetareOprit();
+           LEDrosu.SetareOprit();
+           lcd.clear();
+           if(s_vibratii.citesteVibratii()>2)
+           {
+              lcd.clear();
+              lcd.setCursor(0,0);
+              lcd.print("Senzorul de vibratii activ");
+              LEDverde.SetarePornit();
+              delay(2000);
+              
+           }
+           else
+            {   if(senzor_magnetic.citire()==HIGH)
+                { 
+                  lcd.clear();
+                  lcd.setCursor(0,0);
+                  lcd.print("Senzorul magnetic activ");
+                  LEDverde.SetarePornit();
+                  delay(2000);
+                }
+            }
+            if (digitalRead(buton.returnarePin()) == HIGH)
+            {
+                  stareSistem = stare_pornit;
+                  Serial.print("Stare pornit");
+            }
+            break;
+       case stare_pornit:
+            LEDverde.SetareOprit();
+            LEDrosu.SetareOprit();
+            Serial.print("Intrat case stare_pornit");
+            Serial.print(s_vibratii.vibratiiMaxime(A5,100));
+            if(s_vibratii.citesteVibratii()==0 && senzor_magnetic.citire()==LOW)
+            {
+                 lcd.clear();
+                 LEDverde.SetarePornit();
+                 delay(2000);
+                 LEDverde.SetareOprit();
+                 delay(2000);
+            }
+            else
+            {
+               stareSistem= stare_efractie;
+               Serial.print("Stare efractie");
+            }
+            //if (digitalRead(buton.returnarePin()) == HIGH)
+            //{
+                 // stareSistem = stare_senzor_detecteaza;
+           // }
+            break;
+       case stare_efractie:
+            LEDverde.SetareOprit();
+            LEDrosu.SetareOprit();
+            Serial.print("A intrat stare efractie!");
+            if(s_vibratii.citesteVibratii()>2 || senzor_magnetic.citire()==HIGH)
+             {
+                  lcd.clear();
+                  lcd.setCursor(0,0);
+                  lcd.print("Efractie!!!!");
+                  LEDrosu.SetarePornit();
+                  delay(2000);
+                  
+             }
+            if (digitalRead(buton.returnarePin()) == HIGH)
+            {
+                  stareSistem = stare_senzor_detecteaza;
+                  Serial.print("plecat");
+            }
+            break;
+   }
+}
